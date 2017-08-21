@@ -23,6 +23,15 @@ sources:
 	./etc/status/fetch-dependencies.sh # web assets fetch
 	tar rvf $(SOURCES) $(PIP_DEPS_DIR) $(WEBAPP_DIR)
 
+# Build zuul bundle from the internet. Comes handy when not inside git repo
+build-online:
+	$(VIRTUALENV) $(VENV_DIR)
+	$(VENV_ACTIVATE) && pip install -U pip # fails with old pip
+	$(VENV_ACTIVATE) && pip install -r requirements.txt
+	$(VENV_ACTIVATE) && python setup.py install
+	rm -f $(VENV_DIR)/pip-selfcheck.json
+	$(VIRTUALENV) --relocatable $(VENV_DIR)
+
 # Build zuul bundle from zuul and it's dependencies
 build: build.state
 
