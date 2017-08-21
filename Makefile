@@ -1,39 +1,26 @@
-.PHONY: sources build install clean
+.PHONY: tarball build install clean
 
 SOURCES := sources.tar
 VIRTUALENV ?= /usr/bin/virtualenv
 VENV_DIR := .venv
 VENV_ACTIVATE := source $(VENV_DIR)/bin/activate
-PIP_DEPS_DIR := pip-deps
-PIP_DOWNLOAD := pip install --download $(PIP_DEPS_DIR)
 PWD := $(shell pwd)
-PIP_INSTALL_FROM_CACHE := pip install --no-index --find-links file://$(PWD)/$(PIP_DEPS_DIR)
 WEBAPP_DIR := etc/status
 
-# Create source archive including zuul and pip dependencies
-sources:
-	mkdir -p $(PIP_DEPS_DIR)
+# Create source archive
+tarball:
 	git archive --format=tar HEAD^{tree} > $(SOURCES)
-	$(VIRTUALENV) $(VENV_DIR)
-	$(VENV_ACTIVATE) && $(PIP_DOWNLOAD) pip
-	$(VENV_ACTIVATE) && $(PIP_INSTALL_FROM_CACHE) --upgrade pip # fails with old pip
-	$(VENV_ACTIVATE) && \
-		$(PIP_DOWNLOAD) --requirement requirements.txt \
-		--requirement test-requirements.txt
-	./etc/status/fetch-dependencies.sh # web assets fetch
-	tar rvf $(SOURCES) $(PIP_DEPS_DIR) $(WEBAPP_DIR)
+	tar rvf $(SOURCES) $(WEBAPP_DIR)
 
-# Build zuul bundle from zuul and it's dependencies
-build: build.state
-
-build.state:
+# Build zuul bundle
+build:
 	$(VIRTUALENV) $(VENV_DIR)
-	$(VENV_ACTIVATE) && $(PIP_INSTALL_FROM_CACHE) --upgrade pip # fails with old pip
-	$(VENV_ACTIVATE) && $(PIP_INSTALL_FROM_CACHE) --requirement requirements.txt
+	$(VENV_ACTIVATE) && pip install -U pip
+	$(VENV_ACTIVATE) && pip install -r requirements.txt
+	$(VENV_ACTIVATE) && ./etc/status/fetch-dependencies.sh # web assets fetch
 	$(VENV_ACTIVATE) && python setup.py install
 	rm -f $(VENV_DIR)/pip-selfcheck.json
 	$(VIRTUALENV) --relocatable $(VENV_DIR)
-	touch $@
 
 # Install zuul bundle into DESTDIR
 install:
@@ -49,9 +36,8 @@ test-logging:
 	tox -e venv -- timeout --preserve-status 10 zuul-server -c integration/config/zuul.conf -d
 	grep -F 'zuul.GithubConnection' integration/.test/log/zuul.log
 
-check: build.state
+check: build
 	$(VENV_ACTIVATE) && \
-		$(PIP_INSTALL_FROM_CACHE) --requirement test-requirements.txt \
-		--requirement requirements.txt
+		pip install -r test-requirements.txt -r requirements.txt
 	$(VENV_ACTIVATE) && \
 		OS_TEST_TIMEOUT=30 python setup.py testr --slowest
