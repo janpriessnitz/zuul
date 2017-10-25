@@ -22,6 +22,9 @@ import webob.dec
 import voluptuous as v
 import github3
 from github3.exceptions import MethodNotAllowed
+from github3.exceptions import ServerError
+from requests.exceptions import RequestException
+import time
 
 from zuul.connection import BaseConnection
 from zuul.exceptions import MergeFailure
@@ -228,7 +231,7 @@ class GithubUser(collections.Mapping):
         return len(self._data)
 
     def _init_data(self):
-        user = self._github.user(self._username)
+        user = makeRequest(self._github.user, self._username)
         log_rate_limit(self.log, self._github)
         data = {
             'username': user.login,
@@ -265,7 +268,7 @@ class GithubConnection(BaseConnection):
     def _authenticateGithubAPI(self):
         token = self.connection_config.get('api_token', None)
         if token is not None:
-            self.github = github3.login(token=token)
+            self.github = makeRequest(github3.login, token=token)
             self.log.info("Github API Authentication successful.")
         else:
             self.github = None
@@ -296,13 +299,15 @@ class GithubConnection(BaseConnection):
         return '%s/pull/%s' % (self.getGitwebUrl(project), number)
 
     def getPull(self, owner, project, number):
-        pr = self.github.pull_request(owner, project, number).as_dict()
+        pr = makeRequest(self.github.pull_request,
+                         owner, project, number).as_dict()
         log_rate_limit(self.log, self.github)
         return pr
 
     def getPullFileNames(self, owner, project, number):
         filenames = [f.filename for f in
-                     self.github.pull_request(owner, project, number).files()]
+                     makeRequest(self.github.pull_request,
+                                 owner, project, number).files()]
         log_rate_limit(self.log, self.github)
         return filenames
 
@@ -313,15 +318,18 @@ class GithubConnection(BaseConnection):
         return 'https://%s/%s' % (self.git_host, login)
 
     def commentPull(self, owner, project, pr_number, message):
-        pull_request = self.github.issue(owner, project, pr_number)
-        pull_request.create_comment(message)
+        pull_request = makeRequest(self.github.issue,
+                                   owner, project, pr_number)
+        makeRequest(pull_request.create_comment, message)
         log_rate_limit(self.log, self.github)
 
     def mergePull(self, owner, project, pr_number, commit_message='',
                   sha=None):
-        pull_request = self.github.pull_request(owner, project, pr_number)
+        pull_request = makeRequest(self.github.pull_request,
+                                   owner, project, pr_number)
         try:
-            result = pull_request.merge(commit_message=commit_message, sha=sha)
+            result = makeRequest(pull_request.merge,
+                                 commit_message=commit_message, sha=sha)
         except MethodNotAllowed as e:
             raise MergeFailure('Merge was not successful due to mergeability'
                                ' conflict, original error is %s' % e)
@@ -331,30 +339,49 @@ class GithubConnection(BaseConnection):
 
     def setCommitStatus(self, owner, project, sha, state,
                         url='', description='', context=''):
-        repository = self.github.repository(owner, project)
-        repository.create_status(sha, state, url, description, context)
+        repository = makeRequest(self.github.repository, owner, project)
+        makeRequest(repository.create_status,
+                    sha, state, url, description, context)
         log_rate_limit(self.log, self.github)
 
     def labelPull(self, owner, project, pr_number, label):
-        pull_request = self.github.issue(owner, project, pr_number)
-        pull_request.add_labels(label)
+        pull_request = makeRequest(self.github.issue,
+                                   owner, project, pr_number)
+        makeRequest(pull_request.add_labels, label)
         log_rate_limit(self.log, self.github)
 
     def unlabelPull(self, owner, project, pr_number, label):
-        pull_request = self.github.issue(owner, project, pr_number)
-        pull_request.remove_label(label)
+        pull_request = makeRequest(self.github.issue,
+                                   owner, project, pr_number)
+        makeRequest(pull_request.remove_label, label)
         log_rate_limit(self.log, self.github)
 
 
 def log_rate_limit(log, github):
     try:
-        rate_limit = github.rate_limit()
+        rate_limit = makeRequest(github.rate_limit)
         remaining = rate_limit['resources']['core']['remaining']
         reset = rate_limit['resources']['core']['reset']
     except:
         return
     log.debug('GitHub API rate limit remaining: %s reset: %s' %
               (remaining, reset))
+
+
+# Wrapper for communication with Github. Ensures zuul tries again if
+# network error occurs.
+def makeRequest(self, function, *args, **kwargs):
+    max_attempts = 5
+    for retries in range(max_attempts - 1, -1, -1):
+        try:
+            return function(*args, **kwargs)
+        except (ServerError, RequestException) as e:
+            self.log.error("Network error while communication with Github."
+                           " Trying again %d times. Original error: %s" %
+                           ((retries), e))
+            if not retries:
+                raise
+            time.sleep(1)
 
 
 def getSchema():
