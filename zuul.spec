@@ -1,10 +1,12 @@
 %global install_dir /opt/gdc/zuul
 
+%{!?gdcversion: %define gdcversion local}
+
 Name:             zuul
 Summary:          GoodData customized Zuul gatekeeper
 Epoch:            1
-Version:          2.5.1
-Release:          %(date +%%Y%%m%%d%%H%%M%%S)%{?dist}.gdc
+Version:          2.5.1%{gdcversion}
+Release:          %{?dist}.gdc
 
 Vendor:           GoodData
 Group:            GoodData/Tools

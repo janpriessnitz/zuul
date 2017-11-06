@@ -9,6 +9,7 @@ WEBAPP_DIR := etc/status
 .PHONY: tarball
 tarball:
 	git archive --format=tar HEAD^{tree} > $(SOURCES)
+	export GDCVERSION=123454321
 
 # Build zuul bundle
 .PHONY: build
@@ -20,6 +21,7 @@ build:
 	$(VENV_ACTIVATE) && python setup.py install
 	rm -f $(VENV_DIR)/pip-selfcheck.json
 	$(VIRTUALENV) --relocatable $(VENV_DIR)
+	touch $@.state
 
 # Install zuul bundle into DESTDIR
 .PHONY: install
@@ -37,3 +39,8 @@ test-logging:
 	rm -f integration/.test/log/*
 	tox -e venv -- timeout --preserve-status 10 zuul-server -c integration/config/zuul.conf -d
 	grep -F 'zuul.GithubConnection' integration/.test/log/zuul.log
+
+.PHONY: check
+check: build.state
+	$(VENV_ACTIVATE) && \
+		OS_TEST_TIMEOUT=30 python setup.py testr --slowest
