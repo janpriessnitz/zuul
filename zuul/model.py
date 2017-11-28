@@ -991,6 +991,8 @@ class PullRequest(Change):
         super(PullRequest, self).__init__(project)
         self.updated_at = None
         self.title = None
+        self.head_name = None
+        self.head_branch = None
 
     def isUpdateOf(self, other):
         if (hasattr(other, 'project') and self.project == other.project and
@@ -1114,6 +1116,8 @@ class GithubTriggerEvent(TriggerEvent):
         super(GithubTriggerEvent, self).__init__()
         self.title = None
         self.files = []
+        self.head_name = None
+        self.head_ref = None
 
     def isPatchsetCreated(self):
         return self.type in ['pr-open', 'pr-change']

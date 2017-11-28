@@ -583,3 +583,17 @@ class TestGithub(ZuulTestCase):
         self.assertEqual(len(self.history), 4)
         self.assertEqual(A.statuses['check']['state'], 'success')
         self.assertEqual(B.statuses['check']['state'], 'success')
+
+    def test_delete_head_branch(self):
+        """Tests that Zuul deletes head branch from head repo
+        when delete-head is set to true"""
+
+        A = self.fake_github.openFakePullRequest('org/project', 'master', 'A')
+        self.fake_github.emitEvent(A.addLabel('merge'))
+
+        self.waitUntilSettled()
+
+        gate_status = A.statuses['gate']
+        self.assertEqual('success', gate_status['state'])
+        self.assertIn((A.head_name, A.head_ref),
+                      self.fake_github.deleted_branches)

@@ -510,6 +510,9 @@ class FakeGithubPullRequest(object):
         self._createPRRef()
         self._addCommitToRepo(files=files)
         self._updateTimeStamp()
+        self.head_ref = 'fix_' + str(random.randint(1000, 9999))
+        self.head_name = 'user_' + str(random.randint(1000, 9999)) + \
+                         '/' + project.split('/')[1]
 
     def addCommit(self, files=[]):
         """Adds a commit on top of the actual PR head."""
@@ -596,7 +599,11 @@ class FakeGithubPullRequest(object):
                     }
                 },
                 'head': {
-                    'sha': self.head_sha
+                    'sha': self.head_sha,
+                    'ref': self.head_ref,
+                    'repo': {
+                        'full_name': self.head_name
+                    }
                 }
             },
             'label': {
@@ -684,7 +691,11 @@ class FakeGithubPullRequest(object):
                     }
                 },
                 'head': {
-                    'sha': self.head_sha
+                    'sha': self.head_sha,
+                    'ref': self.head_ref,
+                    'repo': {
+                        'full_name': self.head_name
+                    }
                 }
             },
             'sender': {
@@ -709,6 +720,7 @@ class FakeGithubConnection(zuul.connection.github.GithubConnection):
         self.merge_failure = False
         self.merge_not_allowed_count = 0
         self.files = {}
+        self.deleted_branches = []
 
     def api_called(self, count, method):
         self.api_calls += count
@@ -785,7 +797,11 @@ class FakeGithubConnection(zuul.connection.github.GithubConnection):
                 'ref': pr.branch,
             },
             'head': {
-                'sha': pr.head_sha
+                'sha': pr.head_sha,
+                'ref': pr.head_ref,
+                'repo': {
+                    'full_name': pr.head_name
+                }
             }
         }
         return data
@@ -853,6 +869,11 @@ class FakeGithubConnection(zuul.connection.github.GithubConnection):
         self.api_called(2, 'unlabelPull')
         pull_request = self.pull_requests[pr_number - 1]
         pull_request.removeLabel(label)
+
+    def deleteBranch(self, owner, project, branch):
+        self.deleted_branches.append((('%s/%s' % (owner, project)), branch))
+        print(self.deleted_branches)
+        return True
 
 
 class BuildHistory(object):

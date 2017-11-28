@@ -34,6 +34,8 @@ class GithubReporter(BaseReporter):
         self._create_comment = self.reporter_config.get('comment', False)
         self._merge = self.reporter_config.get('merge', False)
         self._labels = self.reporter_config.get('label', [])
+        self._delete_merged_branch = \
+            self.reporter_config.get('delete-head', False)
         if not isinstance(self._labels, list):
             self._labels = [self._labels]
 
@@ -57,6 +59,8 @@ class GithubReporter(BaseReporter):
         if (self._merge and
             hasattr(item.change, 'number')):
             self.mergePull(item)
+            if self._delete_merged_branch:
+                self.deleteHeadBranch(item)
         if self._labels:
             self.setLabels(item)
 
@@ -109,6 +113,15 @@ class GithubReporter(BaseReporter):
             self.connection.mergePull(owner, project, pr_number, message, sha)
         item.change.is_merged = True
 
+    def deleteHeadBranch(self, item):
+        owner, project = item.change.head_name.split('/')
+        branch = item.change.head_branch
+        self.log.debug('Deleting head branch %s of PR %d in %s' %
+                       (branch, item.change.number, item.change.head_name))
+        if not self.connection.deleteBranch(owner, project, branch):
+            self.log.error('Deleting branch %s in %s was not successful' %
+                           (branch, item.change.head_name))
+
     def setLabels(self, item):
         owner, project = item.change.project.name.split('/')
         pr_number = item.change.number
@@ -157,6 +170,7 @@ def getSchema():
         'status': bool,
         'comment': bool,
         'merge': bool,
+        'delete-head': bool,
         'label': toList(str)
     })
     return github_reporter

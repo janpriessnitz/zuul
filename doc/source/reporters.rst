@@ -62,6 +62,13 @@ reporter. It has the following options.
   ``label: 'test successful'``
   ``label: '-test failed'``
 
+  **delete-head**
+  Boolean value (``true`` or ``false``) that determines if the reporter should
+  delete head branch of the pull request in source repository after it
+  successfully merges.
+  Valid only when ``merge=true``.
+  Defaults to ``false``.
+  ``delete-head=true``
 
 SMTP
 ----

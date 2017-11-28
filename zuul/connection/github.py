@@ -209,8 +209,9 @@ class GithubWebhookListener():
 
         owner, project = event.project_name.split('/')
         event.files = self.connection.getPullFileNames(
-            owner, project, event.change_number
-        )
+            owner, project, event.change_number)
+        event.head_name = head.get('repo').get('full_name')
+        event.head_ref = head.get('ref')
 
         return event
 
@@ -366,6 +367,10 @@ class GithubConnection(BaseConnection):
         pull_request = self.github.issue(owner, project, pr_number)
         pull_request.remove_label(label)
         log_rate_limit(self.log, self.github)
+
+    def deleteBranch(self, owner, project, branch):
+        ref = self.github.repository(owner, project).ref("heads/" + branch)
+        return ref.delete()
 
 
 def log_rate_limit(log, github):

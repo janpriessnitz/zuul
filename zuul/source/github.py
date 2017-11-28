@@ -55,6 +55,8 @@ class GithubSource(BaseSource):
             change.number = event.change_number
             change.refspec = event.refspec
             change.branch = event.branch
+            change.head_name = event.head_name
+            change.head_branch = event.head_ref
             change.url = event.change_url
             change.updated_at = self._ghTimestampToDate(event.updated_at)
             change.patchset = event.patch_number
