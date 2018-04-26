@@ -52,17 +52,22 @@ describe 'Github pull request' do
 
     # poll on the pull request commit status named 'check'
     puts 'Waiting for check status'
-    check_status = wait_successful_pr_status(@github, repo_fqn, pull, 'check')
+    check_status = wait_finished_pr_status(@github, repo_fqn, pull, 'check')
     expect(check_status).to eq('success')
 
     # Add a 'merge' label to the pull request
     puts 'Adding a merge label'
     @github.add_labels_to_an_issue(repo_fqn, pull.number, ['merge'])
 
+    # Push to PR to abort gate pipeline
+    puts 'Adding another commit to PR'
+    git_repo.create_test_commit(filename)
+    git_repo.git.push('origin', test_branch, force: true)
+
     # poll on the pull request commit status named 'gate'
     puts 'Waiting for gate status'
-    gate_status = wait_successful_pr_status(@github, repo_fqn, pull, 'gate')
-    expect(gate_status).to eq('success')
+    gate_status = wait_finished_pr_status(@github, repo_fqn, pull, 'gate')
+    expect(gate_status).to eq('failure')
 
     # # verify the PR is merged
     puts 'Checking the PR merged state'
@@ -89,11 +94,11 @@ def wait_pr_merged(github, repo, pull, timeout = 300)
   end
 end
 
-def wait_successful_pr_status(github, repo, pull, status_name, timeout = 300)
+def wait_finished_pr_status(github, repo, pull, status_name, timeout = 300)
   poll_interval = 10
   loop do
     status = latest_commit_status(github, repo, pull.head.sha, status_name)
-    return status if status == 'success' || timeout < 0
+    return status if status == 'success' || status == 'failure' || timeout < 0
     sleep(poll_interval)
     timeout -= poll_interval
     poll_interval += 10 if poll_interval <= 60
