@@ -52,22 +52,16 @@ describe 'Github pull request' do
 
     # poll on the pull request commit status named 'check'
     puts 'Waiting for check status'
-    check_status = wait_finished_pr_status(@github, repo_fqn, pull, 'check')
-    expect(check_status).to eq('success')
+    # do not wait for check to finish
 
     # Add a 'merge' label to the pull request
     puts 'Adding a merge label'
     @github.add_labels_to_an_issue(repo_fqn, pull.number, ['merge'])
 
-    # Push to PR to abort gate pipeline
-    puts 'Adding another commit to PR'
-    git_repo.create_test_commit(filename)
-    git_repo.git.push('origin', test_branch, force: true)
-
     # poll on the pull request commit status named 'gate'
     puts 'Waiting for gate status'
     gate_status = wait_finished_pr_status(@github, repo_fqn, pull, 'gate')
-    expect(gate_status).to eq('failure')
+    expect(gate_status).to eq('success')
 
     # # verify the PR is merged
     puts 'Checking the PR merged state'
