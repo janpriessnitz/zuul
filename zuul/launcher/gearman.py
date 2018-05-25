@@ -496,7 +496,7 @@ class Gearman(object):
         stop_uuid = str(uuid4().hex)
         data = dict(name=build.job.name,
                     number=build.number)
-        return False
+        return True
         stop_job = gear.Job("stop:%s" % build.__gearman_manager,
                             json.dumps(data), unique=stop_uuid)
         self.meta_jobs[stop_uuid] = stop_job
